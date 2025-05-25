@@ -37,7 +37,7 @@ def update_res_value(file_path, data, downloaded_ids):
                 folder_name = str(folder_id)
                 for item in value:
                     media_name = os.path.basename(urllib.parse.urlparse(item['res']).path)
-                    new_res_value = f'https://minhh2792.is-a.dev/mcr/{folder_id}/{media_name}'
+                    new_res_value = f'https://minhh2792.moe/mcr/{folder_id}/{media_name}'
                     item['res'] = new_res_value
                     logging.info(f'[UPDATE] Updated "res" value for ID: {folder_id}, File: {media_name}')
 
