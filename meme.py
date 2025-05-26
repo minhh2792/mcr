@@ -8,13 +8,19 @@ import validators
 from shutil import copyfile
 
 logging.basicConfig(level=logging.INFO, format='%(message)s')
+# NOTE
+# For now™, only the top most ID of a trigger is registered.
+# Importing and merging are highly discouraged.
 
 def is_valid_url(url):
-    return validators.url(url)
+    return validators.url(url, strict_query=False) # Cho phép vượt qua validation khi query chết
+    # Most likely unsafe practice but for now it works
 
 def create_folders(ids):
     created_folders = 0
-    for folder_id in ids:
+    # Flatten the list of IDs
+    flat_ids = [id for sublist in ids for id in sublist]
+    for folder_id in flat_ids:
         folder_name = str(folder_id)
         try:
             os.makedirs(folder_name, exist_ok=True)
@@ -36,12 +42,21 @@ def update_res_value(file_path, data, downloaded_ids):
             if folder_id in downloaded_ids:
                 folder_name = str(folder_id)
                 for item in value:
-                    media_name = os.path.basename(urllib.parse.urlparse(item['res']).path)
+                    media_name = get_media_name(item['res']) # Used new function to better work with proxied URLs
                     new_res_value = f'https://minhh2792.moe/mcr/{folder_id}/{media_name}'
                     item['res'] = new_res_value
                     logging.info(f'[UPDATE] Updated "res" value for ID: {folder_id}, File: {media_name}')
 
         yaml.dump(current_data, file, default_flow_style=False, allow_unicode=True)
+
+def get_media_name(url):
+    # Encode the URL properly to handle special characters
+    parsed = urllib.parse.urlparse(urllib.parse.unquote(url))
+    if '?' in url:
+        # If it's a proxied URL, parse the actual URL after the '?'
+        actual_url = parsed.query
+        return os.path.basename(urllib.parse.urlparse(actual_url).path)
+    return os.path.basename(parsed.path)
 
 def download_media(data, downloaded_ids):
     total_size = sum(len(value) for value in data.values())
@@ -62,7 +77,7 @@ def download_media(data, downloaded_ids):
             total_files += 1
             url = item['res']
 
-            media_name = os.path.basename(urllib.parse.urlparse(url).path)
+            media_name = get_media_name(url) # Used new function to better work with proxied URLs
             media_path = os.path.join(folder_name, media_name)
 
             try:
@@ -89,13 +104,14 @@ def download_media(data, downloaded_ids):
     return downloaded_ids
 
 def main():
-    file_path = 'data.yml'
-    copyfile(file_path, 'data_copy.yml')
+    file_path = 'patched.yml'
+    copyfile(file_path, 'patched_copy.yml')
 
-    with open('data_copy.yml', 'r', encoding='utf-8') as file:
+    with open('patched_copy.yml', 'r', encoding='utf-8') as file:
         data = yaml.safe_load(file)
 
-    ids = [item[0]['id'] for item in data.values()]
+    # Get all IDs from each trigger's responses
+    ids = [[item['id'] for item in value] for value in data.values()]
     created_folders = create_folders(ids)
     
     downloaded_ids = set()
@@ -105,7 +121,7 @@ def main():
     else:
         logging.error('[ERROR] No folders were created. Aborting download.')
 
-    update_res_value('data_copy.yml', data, downloaded_ids)
+    update_res_value('patched_copy.yml', data, downloaded_ids)
 
 if __name__ == "__main__":
     main()
